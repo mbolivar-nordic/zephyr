@@ -28,14 +28,14 @@ These files provides shield configuration as follows:
   compilation.
 
 * **Kconfig.shield**: This file defines shield Kconfig symbols that will be
-  used for default shield configuration. To ease use with applications,
-  the default shield configuration here should be consistent with those in
-  the :ref:`default_board_configuration`.
+  used for default shield configuration.
 
-* **Kconfig.defconfig**: This file defines the default shield configuration. It
-  is made to be consistent with the :ref:`default_board_configuration`. Hence,
-  shield configuration should be done by keeping in mind that features
-  activation is application responsibility.
+* **Kconfig.defconfig**: This file defines the default shield configuration.
+
+To ease use with applications, these Kconfig files should be consistent with
+those mentioned in :ref:`write_board_kconfig`. Hence, shield configuration
+writers should keep in mind that feature activation is the application's
+responsibility.
 
 Board compatibility
 *******************

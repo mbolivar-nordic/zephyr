@@ -182,8 +182,6 @@ The optional files are:
 - :file:`plank.yaml`: a YAML file with miscellaneous metadata used by the
   :ref:`sanitycheck_script`.
 
-.. _default_board_configuration:
-
 Write your devicetree
 *********************
 
@@ -245,6 +243,8 @@ If you're in a hurry, simple hardware can usually be supported by copy/paste
 followed by trial and error. If you want to understand details, you will need
 to read the rest of the devicetree documentation and the devicetree
 specification.
+
+.. _write_board_kconfig:
 
 Write Kconfig files
 *******************
