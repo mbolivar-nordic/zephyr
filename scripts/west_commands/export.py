@@ -45,19 +45,10 @@ class ZephyrExport(WestCommand):
         # The 'share' subdirectory of the top level zephyr repository.
         share = Path(__file__).parents[2] / 'share'
 
-        if which('ninja') is not None:
-            generator = 'Ninja'
-        elif which('make') is not None:
-            generator = 'Unix Makefiles'
-        else:
-            log.die('neither ninja nor make is installed')
+        run_cmake_and_clean_up(share / 'zephyr-package' / 'cmake')
+        run_cmake_and_clean_up(share / 'zephyrunittest-package' / 'cmake')
 
-        run_cmake_and_clean_up(str(share / 'zephyr-package' / 'cmake'),
-                               generator)
-        run_cmake_and_clean_up(str(share / 'zephyrunittest-package' / 'cmake'),
-                               generator)
-
-def run_cmake_and_clean_up(path, generator):
+def run_cmake_and_clean_up(path):
     # Run a package installation script, cleaning up afterwards.
     #
     # Filtering out lines that start with -- ignores the normal
@@ -65,7 +56,7 @@ def run_cmake_and_clean_up(path, generator):
     # information.
 
     try:
-        lines = run_cmake(['-S', path, '-B', path, f'-G{generator}'],
+        lines = run_cmake(['-S', str(path), '-B', str(path)],
                           capture_output=True)
     finally:
         msg = [line for line in lines if not line.startswith('-- ')]
@@ -74,7 +65,7 @@ def run_cmake_and_clean_up(path, generator):
 
 def clean_up(path):
     try:
-        run_cmake(['--build', path, '--target', 'pristine'],
+        run_cmake(['-P', str(path / 'pristine.cmake')],
                   capture_output=True)
     except CalledProcessError:
         # Do our best to clean up even though CMake failed.
