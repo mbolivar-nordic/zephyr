@@ -103,8 +103,8 @@ def print_nrf_pin_mux(edt):
                     'Property'.ljust(prop_width)]))
     print(table_head_foot)
     for port_pin, users in sorted(pin_map.items(), key=sort_key):
-        if len(users) > 1:
-            print(pin_used_twice)
+        if len(users) <= 1:
+            continue
 
         port, pin = port_pin
         print(f'P{port}.{pin:02} ', end='')
@@ -113,9 +113,6 @@ def print_nrf_pin_mux(edt):
                 print(' ' * (port_pin_width + 1), end='')
             node, prop = user_pprint[user]
             print(f'{node.ljust(node_width)} {prop.ljust(prop_width)}')
-
-        if len(users) > 1:
-            print(pin_used_twice)
     print(table_head_foot)
 
 def sort_key(port_pin_user):
