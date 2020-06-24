@@ -9,80 +9,57 @@
 #include <sys/printk.h>
 #include <stdio.h>
 
+#define DEBRACKETED_HANDLES(node_id, dt_handles, extra_handles)	\
+	DT_DEP_ORD(node_id),					\
+	__DEBRACKET dt_handles					\
+	DEVICE_HANDLE_SEP,					\
+	__DEBRACKET extra_handles				\
+	DEVICE_HANDLE_ENDS,
+
 #define UART0 DT_NODELABEL(uart0)
 
-#define GEN_AUX(...) FOR_EACH_NONEMPTY_TERM(IDENTITY, (,), __VA_ARGS__)
-
-static void dump_ords(const char *tag,
-		      const device_handle_t *cp)
+static void dump_handles(int16_t *handles)
 {
-	const device_handle_t *cps = cp;
-	unsigned int setnum = 0;
-	char buf[128] = {0};
-	char *bp = buf;
+	int16_t *p = handles;
 
-	printk("ordinal sets for %s:\n", tag);
-	while (true) {
-		if ((*cp == DEVICE_HANDLE_SEP)
-		    || (*cp == DEVICE_HANDLE_ENDS)) {
-			printk("\tS%u: %u elts:%s\n", setnum, (unsigned int)(cp - cps), buf);
-			bp = buf;
-			cps = cp + 1;
-			++setnum;
-			if (*cp == DEVICE_HANDLE_ENDS) {
-				break;
-			}
-		} else {
-			bp += snprintf(bp, buf + sizeof(buf) -  bp, " %d", *cp);
-		}
-		++cp;
+	printk("node handle: %d\n", *p);
+	p++;
+
+	while (*p != DEVICE_HANDLE_SEP) {
+		printk("dt-derived handle: %d\n", *p);
+		p++;
 	}
-	printk("%s has %u sets\n", tag, setnum);
+	p++;
+
+	while (*p != DEVICE_HANDLE_ENDS) {
+		printk("non-dt handle: %d\n", *p);
+		p++;
+	}
+	
+	printk("----\n");
 }
 
 void main(void)
 {
-	struct device *devlist;
-	size_t devcnt = z_device_get_all_static(&devlist);
-	const struct device *dpe = devlist + devcnt;
-	struct device *dp = devlist;
+	int16_t only_dt[] = {
+		DEBRACKETED_HANDLES(UART0,
+				    (DT_REQUIRES_DEP_ORDS(UART0)),
+				    ()) 
+	};
 
-	if (false) {
-		static const device_handle_t sets[] = {
-			GEN_AUX()
-			DEVICE_HANDLE_SEP,
-			GEN_AUX(1)
-			DEVICE_HANDLE_SEP,
-			GEN_AUX(1, 2)
-			DEVICE_HANDLE_ENDS,
-		};
-		dump_ords("test", sets);
-	}
+	int16_t only_extra[] = {
+		DEBRACKETED_HANDLES(UART0,
+				    (),
+				    (DEVICE_HANDLE_SYSCLOCK,)) 
+	};
 
-	printk("%zu devices at %p:\n", devcnt, devlist);
-	while (dp < dpe) {
-		const device_handle_t *cp;
-		const char *name = dp->name ? dp->name : "<?>";
-		size_t nc;
+	int16_t dt_and_extra[] = {
+		DEBRACKETED_HANDLES(UART0,
+				    (DT_REQUIRES_DEP_ORDS(UART0)),
+				    (DEVICE_HANDLE_SYSCLOCK,))
+	};
 
-		if (false) {
-			dump_ords(name, dp->ords);
-		}
-
-		cp = device_get_requires_ord(dp, &nc);
-		printk("%p: %s\n", dp, name);
-		if (cp != NULL) {
-			printk("\tSelf %d, parent %d, %u req:",
-			       device_get_self_ord(dp),
-			       device_get_parent_ord(dp),
-			       nc);
-
-			const device_handle_t *cpe = cp + nc;
-			while (cp < cpe) {
-				printk(" %d", *cp++);
-			}
-			printk("\n");
-		}
-		++dp;
-	}
+	dump_handles(only_dt);
+	dump_handles(only_extra);
+	dump_handles(dt_and_extra);
 }
