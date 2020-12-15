@@ -857,7 +857,7 @@ function(board_check_revision)
 
   if(BOARD_REV_FORMAT STREQUAL LETTER)
     set(revision_regex "([A-Z])")
-  elseif(BOARD_REV_FORMAT MATCHES "MAJOR(\.MINOR(\.PATCH)?)?$")
+  elseif(BOARD_REV_FORMAT MATCHES "^MAJOR(\.MINOR(\.PATCH)?)?$")
     set(revision_regex "((0|[1-9]+)")
 
     if(CMAKE_MATCH_1)
@@ -870,7 +870,7 @@ function(board_check_revision)
     set(revision_regex "${revision_regex})")
   else()
     message(FATAL_ERROR "Invalid format specified for \
-    `zephyr_check_board_revision(FORMAT <<LETTER | MAJOR[.MINOR[.PATCH]]>)`")
+    `zephyr_check_board_revision(FORMAT <LETTER | MAJOR[.MINOR[.PATCH]]>)`")
   endif()
 
   if(NOT (BOARD_REVISION MATCHES "^${revision_regex}$"))
