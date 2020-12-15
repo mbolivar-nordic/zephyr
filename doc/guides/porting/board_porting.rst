@@ -182,149 +182,6 @@ The optional files are:
 - :file:`plank.yaml`: a YAML file with miscellaneous metadata used by the
   :ref:`sanitycheck_script`.
 
-.. _porting_board_revisions:
-
-Create multiple board revisions
-*******************************
-
-Sometimes a board exists in multiple revisions with small variations.
-Such variations may impact default Kconfig settings and/or device tree
-configuration.
-
-Zephyr supports multiple revision of boards using the CMake build variable
-``-DBOARD=<board>@<revision>``.
-
-Using revisions allows for minor adjustments to a board configuration without
-duplicating all the files described in :ref:`create-your-board-directory`.
-
-To create a new board revision for the ``plank`` board, let's say revision
-``1.5.0`` that requires adjusted Kconfig settings, create the files
-:file:`revision.cmake` and :file:`plank_1_5_0.conf` in the board folder.
-
-If board revision ``1.5.0`` also requires a device tree overlay, then create
-:file:`plank_1_5_0.overlay` in addition.
-
-This mean your board directory would have those additional files:
-
-.. code-block:: none
-
-   boards/<ARCH>/plank
-   ├── revision.cmake
-   ├── plank_1_5_0.conf
-   └── plank_1_5_0.overlay
-
-If only device overlay is needed, then the :file:`<board>_1_5_0.conf` must still
-be added to the board folder but with empty content.
-
-When building Zephyr, the revision can be selected using
-``-DBOARD=plank@1.5.0``, and the active revision will be printing at CMake
-configure time
-
-.. code-block:: console
-
-   -- Board: plank, Revision: 1.5.0
-
-To implement the Zephyr board revision feature, first create the file
-:file:`revision.cmake` in the board folder.
-Zephyr provides a CMake board extension function to facilitate a single letter
-revision ``A-Z`` or ``MAJOR.MINOR.PATCH`` revisions.
-
-To support ``MAJOR.MINOR.PATCH`` revision for the ``plank`` board, use the
-following code in :file:`revision.cmake`
-
-.. code-block:: cmake
-
-   board_check_revision(FORMAT MAJOR.MINOR.PATCH)
-
-If multiple revisions are available, let's say: ``0.5.0``, ``1.0.0``, ``1.5.0``
-and user selects a revision between those available, in this example ``0.7.0``,
-then the closest lower revision will be used, in this case revision ``0.5.0``.
-
-This allows for only create revision configurations from the board revision that
-introduces a change.
-
-Choosing revision ``0.7.0`` for the plank board will print
-
-.. code-block:: console
-
-   -- Board: plank, Revision: 0.7.0 (Active: 0.5.0)
-
-Revision lesser than the minimum defined will be treated as an error.
-
-You may use the non-revision ``0.0.0`` to allow any lower revision.
-Create the :file:`plank_0_0_0.conf`, to be user for lower versions, as example
-when users selects board revision ``0.1.0``.
-
-The ``EXACT`` keyword can be used to only allow selection of implemented
-revisions.
-If using ``EXACT`` then revision ``0.7.0`` in the ``plank`` example will be
-treated as an error.
-
-.. code-block:: cmake
-
-   board_check_revision(FORMAT MAJOR.MINOR.PATCH EXACT)
-
-This will result in the following message when a user selects the non-supported
-``0.7.0`` revision:
-
-.. code-block:: console
-
-   Board revision `0.7.0` not found.  Please specify a valid board revision.
-
-The ``board_check_revision`` function supports:
-
-.. code-block:: cmake
-
-   board_check_revision(FORMAT <LETTER | MAJOR[.MINOR[.PATCH]]>
-                        [EXACT]
-                        [DEFAULT_REVISION <revision>]
-                        [HIGHEST_REVISION <revision>]
-   )
-
-
-* ``FORMAT LETTER`` revision format is a single letter from A - Z.
-* ``FORMAT MAJOR`` revision format is a single digit, ``x``.
-* ``FORMAT MAJOR.MINOR`` revision format is two digits, separated by ``.``,
-  ``x.y``.
-* ``FORMAT MAJOR.MINOR.PATCH`` revision format is three digits, separated by
-  ``.``, ``x.y.z``.
-
-* ``EXACT`` revision is required to be an exact match. If ``EXACT`` is not
-  provided, then closest lower revision will be selected as the active revision.
-
-* ``DEFAULT_REVISION`` Provides a default revision to use when user has not
-  selected a revision number. If ``DEFAULT_REVISION`` is not specified, then the
-  user will be printed with an error when no revision is given on the command
-  line.
-
-* ``HIGHEST_REVISION`` Allows to specify highest valid revision for a board.
-  This can be used to ensure that a newer board cannot be used with an older
-  Zephyr. As example, if current board supports revisions 0.x.0-0.99.99 and
-  1.0.0-1.99.99, and it is expected that current board implementation will not
-  work with board revision 2.0.0, then HIGHEST_REVISION can be set to 1.99.99,
-  and user will be printed with an error if using ``<board>@2.0.0`` or higher.
-
-.. _porting_custom_board_revisions:
-
-Create custom board revisions
-*****************************
-
-Not all boards uses a versioning principle supported by
-``board_check_revision``, so to support custom board revision of any type, the
-file :file:`revision.cmake` can also be used to directly implement revision
-logic without using ``board_check_revision``.
-
-If the build system should use a different revision than specified by the user,
-then it should inform the build system by setting the variable
-``ACTIVE_BOARD_REVISION`` to the revision that is to be used.
-
-Similar to the example where user selects revision ``0.7.0``, but build system
-will use the build settings for ``0.5.0``, as those two boards are compatible.
-
-Remember that the corresponding Kconfig files and device overlays must be named
-:file:`<board>_<active revision>.conf` and
-:file:`<board>_<active revision>.overlay`.
-
 .. _default_board_configuration:
 
 Write your devicetree
@@ -650,6 +507,201 @@ first ``include`` sets the default runner if it's not already set. For example,
 including ``nrfjprog.board.cmake`` first means that ``nrjfprog`` is the default
 flash runner for this board. Since ``nrfjprog`` does not support debugging,
 ``jlink`` is the default debug runner.
+
+.. _porting_board_revisions:
+
+Multiple board revisions
+************************
+
+See :ref:`application_board_version` for basics on this feature from the user
+perspective.
+
+To create a new board revision for the ``plank`` board, create these additional
+files in the board folder:
+
+.. code-block:: none
+
+   boards/<ARCH>/plank
+   ├── plank_<revision>.conf
+   ├── plank_<revision>.overlay  # optional
+   └── revision.cmake
+
+When the user builds for board ``plank@<revision>``:
+
+- Additional Kconfig settings specified in the file
+  :file:`plank_<revision>.conf` will be merged into the board's default Kconfig
+  configuration.
+
+- The optional devicetree overlay :file:`plank_<revision>.overlay` will be added
+  to the common :file:`plank.dts` devicetree file
+
+- The :file:`revision.cmake` file controls how the Zephyr build system matches
+  the ``<board>@<revision>`` string specified by the user when building an
+  application for the board.
+
+.. important::
+
+   If you only need a devicetree overlay, you must still create an empty
+   :file:`<board>_<revision>.conf` file.
+
+Currently, ``<revision>`` can be either a numeric ``MAJOR.MINOR.PATCH`` style
+revision like ``1.5.0``, or single letter like ``A``, ``B``, etc. Zephyr
+provides a CMake board extension function, ``board_check_revision()``, to make
+it easy to match either style from :file:`revision.cmake`.
+
+The following sections describe how to support these styles of revision
+numbers.
+
+Numeric revisions
+=================
+
+Let's say you want to add support for revisions ``0.5.0``, ``1.0.0``, and
+``1.5.0`` of the ``plank`` board. Create :file:`revision.cmake` with the above
+contents, and create the the following additional files in the board directory:
+
+.. code-block:: none
+
+   boards/<ARCH>/plank
+   ├── plank_0_5_0.conf
+   ├── plank_0_5_0.overlay  # optional
+   ├── plank_1_0_0.conf
+   ├── plank_1_0_0.overlay  # optional
+   ├── plank_1_5_0.conf
+   ├── plank_1_5_0.overlay  # optional
+   └── revision.cmake
+
+Notice how the board files have changed periods (".") in the revision number to
+underscores ("_").
+
+Fuzzy numeric revision matching
+===============================
+
+To support "fuzzy" ``MAJOR.MINOR.PATCH`` revision matching for the ``plank``
+board, use the following code in :file:`revision.cmake`:
+
+.. code-block:: cmake
+
+   board_check_revision(FORMAT MAJOR.MINOR.PATCH)
+
+If the user selects a revision between those available, the closest revision
+number that is not larger than the user's choice is used. For example, if the
+user builds for ``plank@0.7.0``, the build system will target revision
+``0.5.0``.
+
+The build system will print this at CMake configuration time:
+
+.. code-block:: console
+
+   -- Board: plank, Revision: 0.7.0 (Active: 0.5.0)
+
+This allows you to only create revision configuration files for board revision
+numbers that introduce incompatible changes.
+
+Any revision less than the minimum defined will be treated as an error.
+
+You may use ``0.0.0`` as a minimum revision to build for by creating the file
+:file:`plank_0_0_0.conf` in the board directory. This will be used for any
+revision lower than ``0.5.0``, for example if the user builds for
+``plank@0.1.0``.
+
+Exact numeric revision matching
+===============================
+
+Alternatively, the ``EXACT`` keyword can be given to ``board_check_revision()``
+in :file:`revision.cmake` to allow exact matches only, like this:
+
+.. code-block:: cmake
+
+   board_check_revision(FORMAT MAJOR.MINOR.PATCH EXACT)
+
+With this :file:`revision.cmake`, building for ``plank@0.7.0`` in the above
+example will result in the following error message:
+
+.. code-block:: console
+
+   Board revision `0.7.0` not found.  Please specify a valid board revision.
+
+Letter revision matching
+========================
+
+Let's say instead that you need to support revisions ``A``, ``B``, and ``C`` of
+the ``plank`` board. Create the following additional files in the board
+directory:
+
+.. code-block:: none
+
+   boards/<ARCH>/plank
+   ├── plank_A.conf
+   ├── plank_A.overlay  # optional
+   ├── plank_B.conf
+   ├── plank_B.overlay  # optional
+   ├── plank_C.conf
+   ├── plank_C.overlay  # optional
+   └── revision.cmake
+
+And add the following to :file:`revision.cmake`:
+
+.. code-block:: cmake
+
+   board_check_revision(FORMAT LETTER)
+
+board_check_revision() details
+==============================
+
+.. code-block:: cmake
+
+   board_check_revision(FORMAT <LETTER | MAJOR[.MINOR[.PATCH]]>
+                        [EXACT]
+                        [DEFAULT_REVISION <revision>]
+                        [HIGHEST_REVISION <revision>]
+   )
+
+This function supports the following arguments:
+
+* ``FORMAT LETTER``: matches single letter revisions from ``A`` to ``Z`` only
+* ``FORMAT MAJOR``: matches revisions with exactly one digit, like ``1``, ``2``,
+  etc.. Revisions like ``1.2`` or ``0.5`` are not matched.
+* ``FORMAT MAJOR.MINOR``: matches exactly two digits separated by ``.``, like
+  ``1.2``
+* ``FORMAT MAJOR.MINOR.PATCH``: matches exactly three digits separated by
+  ``.``, like ``1.2.3``
+
+* ``EXACT``: if given, the revision is required to be an exact match.
+  Otherwise, the closest matching revision not greater than the user's choice
+  will be selected.
+
+* ``DEFAULT_REVISION <revision>``: if given, ``<revision>`` is the default
+  revision to use when user has not selected a revision number. If not given,
+  the build system prints an error when the user does not specify a board
+  revision.
+
+* ``HIGHEST_REVISION``: if given, specifies the highest valid revision for a
+  board. This can be used to ensure that a newer board cannot be used with an
+  older Zephyr. For example, if the current board directory supports revisions
+  0.x.0-0.99.99 and 1.0.0-1.99.99, and it is expected that the implementation
+  will not work with board revision 2.0.0, then giving ``HIGHEST_REVISION
+  1.99.99`` causes an error if the user builds using ``<board>@2.0.0``.
+
+.. _porting_custom_board_revisions:
+
+Custom revision.cmake files
+***************************
+
+Some boards may not use board revisions supported by
+``board_check_revision()``. To support revisions of any type, the file
+:file:`revision.cmake` can implement custom revision matching without calling
+``board_check_revision()``.
+
+To signal to the build system that it should use a different revision than the
+one specified by the user, :file:`revision.cmake` can set the variable
+``ACTIVE_BOARD_REVISION`` to the revision to use instead. The corresponding
+Kconfig files and devicetree overlays must be named
+:file:`<board>_<ACTIVE_BOARD_REVISION>.conf` and
+:file:`<board>_<ACTIVE_BOARD_REVISION>.overlay`.
+
+For example, if the user builds for ``plank@zero``, :file:`revision.cmake` can
+set ``ACTIVE_BOARD_REVISION`` to ``one`` to use the files
+:file:`plank_one.conf` and :file:`plank_one.overlay`.
 
 .. _contributing-your-board:
 
