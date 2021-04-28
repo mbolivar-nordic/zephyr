@@ -9,7 +9,7 @@ import os
 import platform
 import re
 import shlex
-from subprocess import TimeoutExpired
+import subprocess
 import sys
 import tempfile
 
@@ -131,29 +131,33 @@ class JLinkBinaryRunner(ZephyrBinaryRunner):
 
         A timeout is used since the J-Link Commander takes up to a few seconds
         to exit upon failure.'''
-        if platform.system() == 'Windows' or "microsoft" in platform.release().lower():
-            # The check below does not work on Microsoft Windows or in WSL
-            return None
-
         self.require(self.commander)
 
-        # Matches "V7.11b" version substring
-        ver_re = re.compile(r'(\d+)[.](\d+)([a-z]*)')
+        # For some reason, using self.check_output() with a timeout
+        # doesn't work on Windows. Manually creating a Popen object
+        # and interacting with it line by line does work, however.
+        #
+        # Usually self.check_output() and friends are responsible for
+        # logging any subprocesses, so do it ourselves here.
+        cmd = [self.commander] + ['-bogus-argument-that-does-not-exist']
+        self.logger.debug(f'using {cmd} to get JLink version')
+        popen = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+        output = popen.stdout.readline().decode('utf-8')
+        popen.terminate()
 
-        cmd = ([self.commander] + ['-bogus-argument-that-does-not-exist'])
-        try:
-            self.check_output(cmd, timeout=1)
-        except TimeoutExpired as e:
-            ver_m = ver_re.search(e.output.decode('utf-8'))
-            if ver_m:
-                # Convert major and minor numbers to int for
-                # comparison purposes.
-                groups = ver_m.groups()
-                return (int(groups[0]), int(groups[1]), groups[2])
-            else:
-                # Unknown version.
-                self.logger.warning('cannot parse J-Link version')
-                return (0, 0, '')
+        # Matches e.g. "V7.11b" version substring
+        ver_re = re.compile(r'(\d+)[.](\d+)([a-z]*)')
+        ver_m = ver_re.search(output)
+        if ver_m is None:
+            # Convert major and minor numbers to int for
+            # comparison purposes.
+            self.logger.error(f"can't parse J-Link version from {output}")
+            return None
+
+        groups = ver_m.groups()
+        ver = (int(groups[0]), int(groups[1]), groups[2])
+        self.logger.info(f'JLink version: {ver[0]}.{ver[1]}{ver[2]}')
+        return ver
 
     def supports_nogui(self):
         # -nogui was introduced in J-Link Commander v6.80
