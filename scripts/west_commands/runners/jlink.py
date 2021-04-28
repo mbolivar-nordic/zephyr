@@ -6,6 +6,7 @@
 
 import argparse
 import os
+from pathlib import Path
 import platform
 import re
 import shlex
@@ -18,6 +19,7 @@ from runners.core import ZephyrBinaryRunner, RunnerCaps, \
 
 try:
     from packaging import version
+    from pylink.library import Library
     MISSING_REQUIREMENTS = False
 except ImportError:
     MISSING_REQUIREMENTS = True
@@ -121,54 +123,51 @@ class JLinkBinaryRunner(ZephyrBinaryRunner):
         self.logger.info('J-Link GDB server running on port {}'.
                          format(self.gdb_port))
 
-    def read_version(self):
-        '''Read the J-Link Commander version output.
+    @property
+    def jlink_version(self):
+        '''Get the J-Link version.
 
-        J-Link Commander does not provide neither a stand-alone version string
+        J-Link Commander does not provide a stand-alone version string
         output nor command line parameter help output. To find the version, we
-        launch it using a bogus command line argument (to get it to fail) and
-        read the version information provided to stdout.
+        rely on the third-party pylink library to get the version from an
+        API available in the shared library distributed with the commander'''
+        if not hasattr(self, '_jlink_version'):
+            commander = self.require(self.commander)
+            plat = sys.platform
 
-        A timeout is used since the J-Link Commander takes up to a few seconds
-        to exit upon failure.'''
-        self.require(self.commander)
+            if plat.startswith('win32'):
+                libname = Library.get_appropriate_windows_sdk_name() + '.dll'
+            elif plat.startswith('linux'):
+                libname = Library.JLINK_SDK_NAME + '.so'
+            elif plat.startswith('darwin'):
+                libname = Library.JLINK_SDK_NAME + '.dylib'
+            else:
+                self.logger.warn(f'unknown platform {plat}; assuming UNIX')
+                libname = Library.JLINK_SDK_NAME + '.so'
 
-        # For some reason, using self.check_output() with a timeout
-        # doesn't work on Windows. Manually creating a Popen object
-        # and interacting with it line by line does work, however.
-        #
-        # Usually self.check_output() and friends are responsible for
-        # logging any subprocesses, so do it ourselves here.
-        cmd = [self.commander] + ['-bogus-argument-that-does-not-exist']
-        self.logger.debug(f'using {cmd} to get JLink version')
-        popen = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-        output = popen.stdout.readline().decode('utf-8')
-        popen.terminate()
+            libpath = os.fspath(Path(commander).parent / libname)
+            lib = Library(dllpath=libpath)
+            dll = lib.dll()
+            version = int(dll.JLINKARM_GetDLLVersion())
+            # The return value uses 2 decimal digits per field separator
+            major, minor, rev = (version // 10000,
+                                 (version // 100) % 100,
+                                 version % 100)
+            self._jlink_version = (major, minor, rev)
 
-        # Matches e.g. "V7.11b" version substring
-        ver_re = re.compile(r'(\d+)[.](\d+)([a-z]*)')
-        ver_m = ver_re.search(output)
-        if ver_m is None:
-            # Convert major and minor numbers to int for
-            # comparison purposes.
-            self.logger.error(f"can't parse J-Link version from {output}")
-            return None
-
-        groups = ver_m.groups()
-        ver = (int(groups[0]), int(groups[1]), groups[2])
-        self.logger.info(f'JLink version: {ver[0]}.{ver[1]}{ver[2]}')
-        return ver
+        return self._jlink_version
 
     def supports_nogui(self):
         # -nogui was introduced in J-Link Commander v6.80
-        ver = self.read_version()
-        return ver is not None and ver >= (6, 80, '')
+        return self.jlink_version >= (6, 80, '')
 
     def do_run(self, command, **kwargs):
         if MISSING_REQUIREMENTS:
             raise RuntimeError('one or more Python dependencies were missing; '
                                "see the getting started guide for details on "
                                "how to fix")
+
+        self.logger.info(f'JLink version: {self.jlink_version}')
 
         server_cmd = ([self.gdbserver] +
                       ['-select', 'usb', # only USB connections supported
