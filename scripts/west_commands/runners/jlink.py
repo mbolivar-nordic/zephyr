@@ -125,12 +125,13 @@ class JLinkBinaryRunner(ZephyrBinaryRunner):
 
     @property
     def jlink_version(self):
-        '''Get the J-Link version.
-
-        J-Link Commander does not provide a stand-alone version string
-        output nor command line parameter help output. To find the version, we
-        rely on the third-party pylink library to get the version from an
-        API available in the shared library distributed with the commander'''
+        # Get the J-Link version as a (major, minor, rev) tuple of integers.
+        #
+        # J-Link's command line tools provide neither a standalone
+        # "--version" nor help output that contains the version. Hack
+        # around this deficiency by using the third-party pylink library
+        # to load the shared library distributed with the tools, which
+        # provides an API call for getting the version.
         if not hasattr(self, '_jlink_version'):
             plat = sys.platform
             if plat.startswith('win32'):
@@ -145,19 +146,26 @@ class JLinkBinaryRunner(ZephyrBinaryRunner):
 
             lib = Library(dllpath=os.fspath(Path(self.commander).parent /
                                             libname))
-            dll = lib.dll()
-            version = int(dll.JLINKARM_GetDLLVersion())
-            # The return value uses 2 decimal digits per field separator
-            major, minor, rev = (version // 10000,
-                                 (version // 100) % 100,
-                                 version % 100)
-            self._jlink_version = (major, minor, rev)
+            version = int(lib.dll().JLINKARM_GetDLLVersion())
+            # The return value is an int with 2 decimal digits per
+            # version subfield.
+            self._jlink_version = (version // 10000,
+                                   (version // 100) % 100,
+                                   version % 100)
 
         return self._jlink_version
 
+    @property
+    def jlink_version_str(self):
+        # Converts the numeric revision tuple to something human-readable.
+
+        major, minor, rev = self.jlink_version
+        rev_str = ('a' + chr(rev)) if rev > 0 else ''
+        return f'{major}.{minor:02}{rev_str}'
+
     def supports_nogui(self):
         # -nogui was introduced in J-Link Commander v6.80
-        return self.jlink_version >= (6, 80, '')
+        return self.jlink_version >= (6, 80, 0)
 
     def do_run(self, command, **kwargs):
         if MISSING_REQUIREMENTS:
@@ -168,7 +176,7 @@ class JLinkBinaryRunner(ZephyrBinaryRunner):
         # to find the shared library that tells us what version of the tools
         # we're using.
         self.commander = self.require(self.commander)
-        self.logger.info(f'JLink version: {self.jlink_version}')
+        self.logger.info(f'JLink version: {self.jlink_version_str}')
 
         server_cmd = ([self.gdbserver] +
                       ['-select', 'usb', # only USB connections supported
