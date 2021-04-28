@@ -132,9 +132,7 @@ class JLinkBinaryRunner(ZephyrBinaryRunner):
         rely on the third-party pylink library to get the version from an
         API available in the shared library distributed with the commander'''
         if not hasattr(self, '_jlink_version'):
-            commander = self.require(self.commander)
             plat = sys.platform
-
             if plat.startswith('win32'):
                 libname = Library.get_appropriate_windows_sdk_name() + '.dll'
             elif plat.startswith('linux'):
@@ -145,8 +143,8 @@ class JLinkBinaryRunner(ZephyrBinaryRunner):
                 self.logger.warn(f'unknown platform {plat}; assuming UNIX')
                 libname = Library.JLINK_SDK_NAME + '.so'
 
-            libpath = os.fspath(Path(commander).parent / libname)
-            lib = Library(dllpath=libpath)
+            lib = Library(dllpath=os.fspath(Path(self.commander).parent /
+                                            libname))
             dll = lib.dll()
             version = int(dll.JLINKARM_GetDLLVersion())
             # The return value uses 2 decimal digits per field separator
@@ -166,7 +164,10 @@ class JLinkBinaryRunner(ZephyrBinaryRunner):
             raise RuntimeError('one or more Python dependencies were missing; '
                                "see the getting started guide for details on "
                                "how to fix")
-
+        # Convert commander to an absolute path. We need this to be able
+        # to find the shared library that tells us what version of the tools
+        # we're using.
+        self.commander = self.require(self.commander)
         self.logger.info(f'JLink version: {self.jlink_version}')
 
         server_cmd = ([self.gdbserver] +
@@ -210,8 +211,6 @@ class JLinkBinaryRunner(ZephyrBinaryRunner):
                 self.run_client(client_cmd)
 
     def flash(self, **kwargs):
-        self.require(self.commander)
-
         lines = ['r'] # Reset and halt the target
 
         if self.erase:
