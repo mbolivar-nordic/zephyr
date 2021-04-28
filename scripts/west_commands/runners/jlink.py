@@ -133,25 +133,32 @@ class JLinkBinaryRunner(ZephyrBinaryRunner):
         to exit upon failure.'''
         if platform.system() == 'Windows' or "microsoft" in platform.release().lower():
             # The check below does not work on Microsoft Windows or in WSL
-            return ''
+            return None
 
         self.require(self.commander)
-        # Match "Vd.dd" substring
-        ver_re = re.compile(r'\s+V([.0-9]+)[a-zA-Z]*\s+', re.IGNORECASE)
+
+        # Matches "V7.11b" version substring
+        ver_re = re.compile(r'(\d+)[.](\d+)([a-z]*)')
+
         cmd = ([self.commander] + ['-bogus-argument-that-does-not-exist'])
         try:
             self.check_output(cmd, timeout=1)
         except TimeoutExpired as e:
             ver_m = ver_re.search(e.output.decode('utf-8'))
             if ver_m:
-                return ver_m.group(1)
+                # Convert major and minor numbers to int for
+                # comparison purposes.
+                groups = ver_m.groups()
+                return (int(groups[0]), int(groups[1]), groups[2])
             else:
-                return ''
+                # Unknown version.
+                self.logger.warning('cannot parse J-Link version')
+                return (0, 0, '')
 
     def supports_nogui(self):
-        ver = self.read_version()
         # -nogui was introduced in J-Link Commander v6.80
-        return version.parse(ver) >= version.parse("6.80")
+        ver = self.read_version()
+        return ver is not None and ver >= (6, 80, '')
 
     def do_run(self, command, **kwargs):
         if MISSING_REQUIREMENTS:
