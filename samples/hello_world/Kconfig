@@ -1,0 +1,7 @@
+config BATTERY
+	bool "Include Battery driver"
+	default $(dt_nodelabel_enabled,vbatt)
+	help
+	  Enable Battery driver.
+
+source "Kconfig.zephyr"

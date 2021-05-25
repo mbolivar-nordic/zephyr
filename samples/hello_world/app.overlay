@@ -1,0 +1,8 @@
+/ {
+	vbatt: vbatt {
+		compatible = "voltage-divider";
+		io-channels = <&adc1 8>;
+		output-ohms = <100000>;
+		full-ohms = <(34000 + 100000)>;
+	};
+};
