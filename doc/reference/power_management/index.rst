@@ -3,7 +3,7 @@
 Power Management
 ################
 
-Zephyr RTOS power management subsystem provides several means for a system
+The power management subsystem provides several means for a system
 integrator to implement power management support that can take full
 advantage of the power saving features of SOCs.
 
