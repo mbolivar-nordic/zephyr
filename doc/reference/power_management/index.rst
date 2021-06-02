@@ -25,8 +25,8 @@ Terminology
 
 :dfn:`Power State`
    SOC Power State describes processor and device power states implemented at
-   the SOC level. Power states are represented by :c:enum:`pm_state` and each
-   one has a different meaning.
+   the SOC level. Power states are represented by :c:enum:`pm_state` enumerators.
+   See :ref:`power_management_states`.
 
 :dfn:`Device Runtime Power Management`
    Device Runtime Power Management (PM) refers to the capability of
@@ -78,6 +78,8 @@ Some handful examples using different power management features:
 * :zephyr_file:`tests/subsys/pm/power_mgmt/`
 * :zephyr_file:`tests/subsys/pm/power_mgmt_soc/`
 * :zephyr_file:`tests/subsys/pm/power_state_api/`
+
+.. _power_management_states:
 
 Power States
 ============
