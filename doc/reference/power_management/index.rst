@@ -12,9 +12,9 @@ Terminology
 ***********
 
 :dfn:`SOC interface`
-   This is a general term for the components that have knowledge of the
-   SOC and provide interfaces to the hardware features. It will abstract
-   the SOC specific implementations to the applications and the OS.
+   This is a general term for components that have knowledge of the
+   SOC and provide interfaces to the hardware features. It abstracts
+   SOC specific implementations to applications and the OS.
 
 :dfn:`Idle Thread`
    A system thread that runs when there are no other threads ready to run.
